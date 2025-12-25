@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>指尖上的中国 - 最终展示版</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@200;300;400;600;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ink-base': '#2c2c2c',    // 淡墨（主文字）
+                        'ink-light': '#666666',   // 灰墨（次要文字）
+                        'cyan-jade': '#587375',   // 汝窑青/黛色
+                        'paper': '#f7f8f6',       // 宣纸白
+                        'cinnabar': '#a8362d',    // 朱砂红（印章/点缀）
+                        'gold-muted': '#bfae8f',  // 哑光金（装饰）
+                    },
+                    fontFamily: {
+                        serif: ['"Noto Serif SC"', 'serif'],
+                        calligraphy: ['"Ma Shan Zheng"', 'cursive'],
+                    },
+                    backgroundImage: {
+                        // 噪点纹理，模拟宣纸质感
+                        'noise': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E\")",
+                    },
+                    animation: {
+                        'breathe': 'breathe 10s infinite ease-in-out',
+                    },
+                    keyframes: {
+                        breathe: {
+                            '0%, 100%': { transform: 'scale(1)' },
+                            '50%': { transform: 'scale(1.03)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* ================= 全局设定 ================= */
+        body {
+            background-color: #f7f8f6;
+            color: #2c2c2c;
+            overflow: hidden; /* 禁止原生滚动 */
+            font-weight: 300;
+            cursor: default; /* 隐藏默认光标，稍后 JS 会加特效，或者保持默认但加拖尾 */
+        }
+        
+        /* 滚动容器 */
+        .snap-container {
+            scroll-snap-type: y mandatory;
+            overflow-y: scroll;
+            height: 100vh;
+            scroll-behavior: smooth;
+            position: relative;
+            z-index: 10;
+        }
+        
+        section {
+            scroll-snap-align: start;
+            height: 100vh;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 隐藏滚动条 */
+        .snap-container::-webkit-scrollbar { display: none; }
+        .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* ================= 视觉组件 ================= */
+
+        /* 1. 漂浮尘埃 */
+        .dust-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5; 
+            overflow: hidden;
+        }
+        .dust-particle {
+            position: absolute;
+            background: #bfae8f;
+            border-radius: 50%;
+            opacity: 0;
+            animation: float 20s infinite linear;
+        }
+        @keyframes float {
+            0% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 0.4; }
+            90% { opacity: 0.4; }
+            100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
+        }
+
+        /* 2. 毛玻璃卡片 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+            transition: transform 0.3s ease;
+        }
+
+        /* 3. 图片处理 */
+        .img-modern {
+            filter: grayscale(20%) contrast(90%);
+            transition: all 0.7s ease;
+        }
+        .img-modern:hover {
+            filter: grayscale(0%) contrast(100%);
+        }
+
+        /* 4. 竖排装饰文字 */
+        .vertical-line-text {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            letter-spacing: 0.4em;
+            font-family: 'Noto Serif SC', serif;
+            font-size: 0.75rem;
+            color: #bfae8f;
+            opacity: 0.8;
+            position: absolute;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        /* 5. 闲章 (Seal) */
+        .seal-box {
+            border: 1px solid #a8362d;
+            color: #a8362d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Ma Shan Zheng', cursive;
+            line-height: 1;
+            opacity: 0.9;
+            user-select: none;
+        }
+
+        /* 6. 水墨晕染背景 */
+        .ink-splash {
+            position: absolute;
+            background: radial-gradient(circle, rgba(88,115,117,0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            filter: blur(60px);
+            pointer-events: none;
+        }
+
+        /* ================= 导航系统 ================= */
+        .nav-container-3d {
+            perspective: 800px;
+            transform-style: preserve-3d;
+            height: 100%;
+        }
+
+        .nav-item {
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100%; height: 50px;
+            display: flex; align-items: center; justify-content: flex-end;
+            padding-right: 24px;
+            transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            color: #999; 
+            font-family: 'Noto Serif SC', serif;
+            font-weight: 300;
+            font-size: 0.95rem;
+            cursor: pointer;
+            z-index: 50;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .nav-item.active {
+            color: #2c2c2c;
+            font-weight: 600;
+            font-size: 1.15rem;
+            letter-spacing: 0.1em;
+        }
+        
+        .nav-item.active::after {
+            content: '';
+            display: block;
+            width: 6px; height: 6px;
+            background-color: #a8362d;
+            border-radius: 50%;
+            margin-left: 12px;
+            box-shadow: 0 0 8px rgba(168, 54, 45, 0.4);
+        }
+
+        .nav-line {
+            position: absolute;
+            right: 22px;
+            top: 0; bottom: 0;
+            width: 1px;
+            background: rgba(44, 44, 44, 0.05);
+            pointer-events: none;
+        }
+
+        /* 动画类 */
+        .fade-in-up {
+            animation: fadeInUp 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-noise">
+
+    <div id="audio-toggle" class="fixed top-8 right-40 z-50 cursor-pointer opacity-40 hover:opacity-100 transition duration-300 group hidden md:flex items-center gap-2">
+        <div class="h-px w-6 bg-ink-base group-hover:w-10 transition-all"></div>
+        <span class="text-xs font-serif text-ink-base tracking-widest">静音</span>
+        <audio id="bg-music" loop>
+            <source src="https://assets.mixkit.co/active_storage/sfx/2275/2275-preview.mp3" type="audio/mpeg">
+        </audio>
+    </div>
+
+    <div id="intro-overlay" class="fixed inset-0 z-[100] bg-[#f7f8f6] flex items-center justify-center transition-opacity duration-1000">
+        <div class="text-center relative">
+            <div class="text-6xl text-ink-base font-calligraphy mb-4 animate-pulse">指尖 · 中国</div>
+            <div class="text-xs text-ink-light tracking-[0.5em] uppercase font-serif">Presentation Loading...</div>
+        </div>
+    </div>
+
+    <div class="fixed right-0 top-0 z-50 hidden md:flex flex-col h-screen w-32 pointer-events-none">
+        <div class="nav-line"></div>
+        <div class="flex-1 relative nav-container-3d pointer-events-auto">
+            <div class="absolute top-0 w-full h-40 bg-gradient-to-b from-[#f7f8f6] to-transparent z-20 pointer-events-none"></div>
+            <div class="absolute bottom-0 w-full h-40 bg-gradient-to-t from-[#f7f8f6] to-transparent z-20 pointer-events-none"></div>
+
+            <div id="nav-list" class="relative w-full h-full">
+                <div class="nav-item" onclick="scrollToSection('sec-1')">序 章</div>
+                <div class="nav-item" onclick="scrollToSection('sec-2')">丝 路</div>
+                <div class="nav-item" onclick="scrollToSection('sec-3')">东 风</div>
+                <div class="nav-item" onclick="scrollToSection('sec-4')">山 河</div>
+                <div class="nav-item" onclick="scrollToSection('sec-5')">敦 煌</div>
+                <div class="nav-item" onclick="scrollToSection('sec-6')">活 字</div>
+                <div class="nav-item" onclick="scrollToSection('sec-7')">规 矩</div>
+                <div class="nav-item" onclick="scrollToSection('sec-8')">征 途</div>
+                <div class="nav-item" onclick="scrollToSection('sec-9')">尾 声</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="snap-container font-serif" id="main-container">
+
+        <section id="sec-1">
+            <div class="seal-box w-6 h-10 rounded-[40%] absolute top-8 left-8 writing-vertical text-[10px] border-cinnabar/60">
+                <span>如意</span>
+            </div>
+            <div class="absolute top-20 left-10 text-[20vw] font-calligraphy text-ink-base opacity-[0.02] select-none pointer-events-none leading-none">中华</div>
+            
+            <div class="relative z-10 text-center fade-in-up max-w-2xl px-6">
+                <div class="inline-block px-4 py-1 border-b border-cyan-jade/30 text-cyan-jade text-xs tracking-[0.4em] mb-10 uppercase">
+                    2025 · Computer Science
+                </div>
+                <h1 class="text-6xl md:text-8xl font-serif font-light text-ink-base mb-6 tracking-widest">
+                    指尖<span class="text-cinnabar">.</span>中国
+                </h1>
+                <p class="text-lg md:text-xl text-ink-light font-light tracking-[0.2em] mb-16">
+                    以代码经纬 · 织数字山河
+                </p>
+                <div class="w-12 h-12 mx-auto border border-ink-base/10 rounded-full flex items-center justify-center animate-bounce text-ink-light/50 cursor-pointer hover:border-cinnabar hover:text-cinnabar transition-colors" onclick="scrollToSection('sec-2')">
+                    ↓
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-2" class="bg-white relative">
+            <div class="vertical-line-text left-6 md:left-10 top-1/3 h-40 border-l border-gold-muted/30 pl-3">
+                历史的回响 · 通向未来
+            </div>
+
+            <div class="w-full h-full flex flex-col md:flex-row">
+                <div class="w-full md:w-3/5 h-1/2 md:h-full relative overflow-hidden group">
+                    <img src="./images/road (1).jpg" 
+                         class="absolute inset-0 w-full h-full object-cover img-modern animate-breathe opacity-90" alt="Silk Road">
+                    <div class="absolute inset-0 bg-paper/10 mix-blend-multiply"></div>
+                </div>
+                
+                <div class="w-full md:w-2/5 h-1/2 md:h-full relative flex flex-col justify-center p-12 md:p-16 bg-paper/50 backdrop-blur-sm">
+                    <div class="absolute -left-12 top-1/4 text-9xl font-calligraphy text-ink-base opacity-[0.03] z-0 select-none">脉</div>
+                    
+                    <div class="relative z-10">
+                        <h3 class="text-3xl font-light text-ink-base mb-8 flex items-baseline gap-4">
+                            <span class="text-5xl font-serif text-cyan-jade opacity-30">01</span>
+                            数字脉搏
+                        </h3>
+                        <p class="text-ink-light leading-loose text-justify mb-8 text-sm md:text-base">
+                            驼铃声早已远去，<br>
+                            光纤与卫星编织了新的经纬。<br><br>
+                            我们不再仅仅输出瓷器与茶叶，<br>
+                            <span class="text-cyan-jade border-b border-cyan-jade/30 pb-1">字节流 (Bytes)</span> 
+                            成为了新时代的丝绸。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-3" class="relative">
+            <div class="ink-splash w-[600px] h-[600px] -top-32 -left-32 opacity-60"></div>
+            <div class="ink-splash w-[400px] h-[400px] bottom-0 right-0 bg-cyan-jade/10"></div>
+
+            <div class="max-w-6xl w-full px-8 relative z-10">
+                <div class="flex items-center gap-4 mb-16 pl-2">
+                    <div class="h-[1px] w-16 bg-ink-base opacity-20"></div>
+                    <h2 class="text-2xl tracking-[0.2em] text-ink-base font-light">风从东方来 · 智造</h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="glass-card p-8 hover:-translate-y-2 group relative overflow-hidden">
+                        <div class="absolute top-4 right-4 text-xs text-cyan-jade opacity-30 font-serif">01</div>
+                        <div class="text-3xl text-ink-base/80 mb-6 font-serif opacity-40 group-hover:opacity-100 transition duration-500">TikTok</div>
+                        <h3 class="text-xl text-ink-base mb-3 font-medium">高山流水</h3>
+                        <p class="text-sm text-ink-light leading-relaxed opacity-80">推荐算法的精准分发，让中国生活方式成为全球视窗。</p>
+                    </div>
+                    <div class="glass-card p-8 hover:-translate-y-2 group mt-0 md:mt-12 relative overflow-hidden">
+                        <div class="absolute top-4 right-4 text-xs text-cyan-jade opacity-30 font-serif">02</div>
+                        <div class="text-3xl text-ink-base/80 mb-6 font-serif opacity-40 group-hover:opacity-100 transition duration-500">Wukong</div>
+                        <h3 class="text-xl text-ink-base mb-3 font-medium">造梦工坊</h3>
+                        <p class="text-sm text-ink-light leading-relaxed opacity-80">工业化渲染管线，在数字世界构建东方的山海经。</p>
+                    </div>
+                    <div class="glass-card p-8 hover:-translate-y-2 group mt-0 md:mt-24 relative overflow-hidden">
+                        <div class="absolute top-4 right-4 text-xs text-cyan-jade opacity-30 font-serif">03</div>
+                        <div class="text-3xl text-ink-base/80 mb-6 font-serif opacity-40 group-hover:opacity-100 transition duration-500">SHEIN</div>
+                        <h3 class="text-xl text-ink-base mb-3 font-medium">柔性织造</h3>
+                        <p class="text-sm text-ink-light leading-relaxed opacity-80">传统制造与大数据决策的完美融合，重塑供应链。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-4" class="bg-[#262626] text-[#f7f8f6] relative">
+            <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
+            <div class="seal-box w-10 h-10 absolute top-12 right-12 bg-cinnabar text-white border-none rounded-sm">
+                <span class="text-xs">基<br>石</span>
+            </div>
+            
+            <div class="container mx-auto px-12 flex flex-col md:flex-row items-center gap-16 relative z-10">
+                <div class="md:w-1/2 text-right border-r border-white/10 pr-12">
+                    <h2 class="text-5xl md:text-7xl font-serif font-thin mb-8 text-white/90">经纬 · 山河</h2>
+                    <p class="text-cyan-jade tracking-[0.5em] text-xs uppercase opacity-80">The Great Wall</p>
+                </div>
+                
+                <div class="md:w-1/2 space-y-16">
+                    <div class="group cursor-default pl-4">
+                        <h4 class="text-3xl font-extralight mb-3 group-hover:text-cyan-jade transition-colors duration-500">北斗 · BDS</h4>
+                        <div class="w-full h-[1px] bg-white/10 mb-4 relative overflow-hidden">
+                            <div class="absolute inset-0 bg-cyan-jade w-full -translate-x-full group-hover:translate-x-0 transition duration-700 ease-out"></div>
+                        </div>
+                        <p class="text-white/40 text-sm font-light leading-relaxed">
+                            古有指南车，今有北斗星。<br>
+                            仰望星空，为全球提供精准的时空基准。
+                        </p>
+                    </div>
+                    
+                    <div class="group cursor-default pl-4">
+                        <h4 class="text-3xl font-extralight mb-3 group-hover:text-cyan-jade transition-colors duration-500">长城 · Firewall</h4>
+                        <div class="w-full h-[1px] bg-white/10 mb-4 relative overflow-hidden">
+                            <div class="absolute inset-0 bg-cyan-jade w-full -translate-x-full group-hover:translate-x-0 transition duration-700 ease-out"></div>
+                        </div>
+                        <p class="text-white/40 text-sm font-light leading-relaxed">
+                            网络空间的新防线。<br>
+                            每一行代码，都是守护国民数据的砖石。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-5" class="bg-[#e8e6e1] relative">
+            <img src="./images/dunhuang (2).jpg" 
+                 class="absolute right-0 top-0 w-full md:w-2/3 h-full object-cover grayscale opacity-40 img-modern" 
+                 style="-webkit-mask-image: linear-gradient(to right, transparent 5%, black 80%);" alt="Dunhuang">
+
+            <div class="absolute left-8 md:left-24 top-1/2 -translate-y-1/2 z-10 max-w-lg">
+                <div class="w-20 h-20 border border-ink-base/20 rounded-full flex items-center justify-center mb-10 bg-paper/30 backdrop-blur-sm">
+                    <span class="font-serif italic text-xl text-ink-base">CV</span>
+                </div>
+                <h2 class="text-4xl md:text-5xl font-serif text-ink-base mb-10 leading-tight">
+                    代码守护的<br>
+                    <span class="font-calligraphy text-7xl text-cinnabar/90 ml-2">永恒</span>
+                </h2>
+                <div class="border-l-2 border-cyan-jade/40 pl-8 py-2">
+                    <h3 class="text-lg font-bold text-ink-base mb-2">一眼 · 千年</h3>
+                    <p class="text-ink-light text-justify leading-loose text-sm">
+                        利用计算机视觉，我们将千年的风沙定格。<br>
+                        这不是冰冷的数据备份，这是文明温度的延续。
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-6" class="relative overflow-hidden">
+            <div class="absolute bottom-0 right-10 text-[15vw] font-calligraphy text-ink-base opacity-[0.02] leading-none select-none">生成</div>
+
+            <div class="text-center mb-16 absolute top-16 w-full z-10">
+                <h2 class="text-2xl font-serif tracking-widest text-ink-base">活字 · 神经网络</h2>
+                <p class="text-xs text-ink-light mt-2 tracking-widest opacity-60">From Movable Type to AIGC</p>
+            </div>
+            
+            <div class="flex gap-6 md:gap-12 items-end h-[55vh] relative z-10 px-4">
+                <div class="w-[22vw] h-[35vh] bg-gray-200 relative overflow-hidden img-modern hover:h-[45vh] transition-all duration-700 shadow-xl group cursor-pointer">
+                    <img src="./images/活字 (3).png" class="w-full h-full object-cover" alt="Ink">
+                    <div class="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/60 to-transparent">
+                        <div class="text-white text-xs tracking-widest border-l-2 border-cinnabar pl-2">毕昇 · 活字</div>
+                    </div>
+                </div>
+                <div class="w-[28vw] h-[50vh] bg-gray-200 relative overflow-hidden img-modern shadow-2xl group cursor-pointer">
+                    <img src="./images/活字 (2).png" class="w-full h-full object-cover animate-breathe" alt="Hanfu">
+                    <div class="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/60 to-transparent">
+                        <div class="text-white text-xs tracking-widest border-l-2 border-cinnabar pl-2">万象 · 生成</div>
+                    </div>
+                </div>
+                <div class="w-[22vw] h-[35vh] bg-gray-200 relative overflow-hidden img-modern hover:h-[45vh] transition-all duration-700 shadow-xl group cursor-pointer">
+                    <img src="./images/活字 (1).png" class="w-full h-full object-cover" alt="Opera">
+                    <div class="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/60 to-transparent">
+                        <div class="text-white text-xs tracking-widest border-l-2 border-cinnabar pl-2">传承 · 重构</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="absolute bottom-16 w-full text-center text-ink-light/60 text-xs">
+                <p>千年前，活字重组了文明的载体；今天，Transformer 重组了人类的知识。</p>
+            </div>
+        </section>
+
+        <section id="sec-7" class="bg-[#2c2c2c] text-paper relative">
+            <div class="seal-box w-12 h-12 absolute top-12 left-12 border-gold-muted text-gold-muted rounded-full">
+                <span class="text-sm">戒</span>
+            </div>
+
+            <div class="max-w-4xl text-center z-10">
+                <div class="inline-block mb-8 opacity-40 text-xs tracking-[0.3em]">/ ETHICS /</div>
+                <h2 class="text-4xl md:text-6xl font-extralight mb-20 leading-snug">
+                    不仅是程序员<br>
+                    更是<span class="text-cyan-jade font-serif font-normal">守望者</span>
+                </h2>
+                
+                <div class="flex flex-col md:flex-row justify-center gap-16 text-left px-12">
+                    <div class="w-full md:w-72 border-t border-white/10 pt-6 hover:border-cyan-jade transition duration-500">
+                        <h4 class="text-xl mb-3 text-gold-muted font-light">方圆 · 规矩</h4>
+                        <p class="text-xs text-white/40 leading-relaxed font-light">
+                            Tech for Good.<br>
+                            拒绝算法霸权，保持技术的温良。<br>
+                            不以规矩，不能成方圆。
+                        </p>
+                    </div>
+                    <div class="w-full md:w-72 border-t border-white/10 pt-6 hover:border-cyan-jade transition duration-500">
+                        <h4 class="text-xl mb-3 text-gold-muted font-light">兼济 · 天下</h4>
+                        <p class="text-xs text-white/40 leading-relaxed font-light">
+                            Open Source.<br>
+                            以开放的姿态，展现大国青年的格局。<br>
+                            构建网络空间命运共同体。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-8" class="relative">
+            <div class="vertical-line-text right-32 top-1/4 h-32 border-r border-ink-light/20 pr-3">
+                路漫漫其修远兮
+            </div>
+
+            <div class="text-center z-10 fade-in-up">
+                <p class="text-xs text-cyan-jade tracking-[0.6em] mb-6">THE FUTURE</p>
+                <h2 class="text-6xl md:text-8xl font-calligraphy text-ink-base mb-10">星辰大海</h2>
+                <p class="text-ink-light font-serif text-lg tracking-widest mb-16 opacity-80">
+                    每一行代码，都是通向未来的阶梯。
+                </p>
+                
+                <div class="group relative inline-block cursor-pointer" onclick="alert('感谢观看！')">
+                    <div class="px-10 py-3 border border-cinnabar text-cinnabar text-sm tracking-[0.3em] transition duration-500 group-hover:bg-cinnabar group-hover:text-white relative z-10">
+                        为复兴而编码
+                    </div>
+                    <div class="absolute top-1 left-1 w-full h-full bg-ink-base/5 -z-0"></div>
+                </div>
+            </div>
+            
+            <div class="absolute bottom-0 left-0 w-full h-1/4 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-[0.03] pointer-events-none"></div>
+        </section>
+
+        <section id="sec-9">
+            <div class="glass-card px-20 py-16 text-center relative overflow-hidden shadow-2xl">
+                <div class="text-cinnabar text-4xl font-serif mb-4">谢</div>
+                <div class="w-px h-10 bg-ink-light mx-auto my-6 opacity-20"></div>
+                <p class="text-ink-base tracking-[0.2em] mb-10 font-light">Q & A</p>
+                
+                <div class="text-[10px] text-ink-light uppercase tracking-[0.3em] opacity-40">
+                    Created by Frontend Team · 2025
+                </div>
+
+                <div class="absolute bottom-6 right-6 border border-cinnabar text-cinnabar w-10 h-10 flex items-center justify-center font-calligraphy text-sm rounded-sm opacity-60 rotate-12 select-none">
+                    <span>匠心</span>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        function scrollToSection(id) {
+            const section = document.getElementById(id);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. 初始化：移除遮罩 & 生成尘埃
+            setTimeout(() => {
+                const overlay = document.getElementById('intro-overlay');
+                if(overlay) overlay.style.opacity = '0';
+                setTimeout(() => {
+                    if(overlay) overlay.remove(); 
+                    initDust(); 
+                }, 1000);
+            }, 1200);
+
+            // 2. 生成尘埃粒子
+            function initDust() {
+                const dustContainer = document.createElement('div');
+                dustContainer.className = 'dust-container';
+                document.body.appendChild(dustContainer);
+
+                for (let i = 0; i < 30; i++) {
+                    const p = document.createElement('div');
+                    p.className = 'dust-particle';
+                    const size = Math.random() * 3 + 1;
+                    p.style.width = `${size}px`;
+                    p.style.height = `${size}px`;
+                    p.style.left = `${Math.random() * 100}vw`;
+                    p.style.top = `${Math.random() * 100}vh`;
+                    p.style.animationDuration = `${Math.random() * 20 + 20}s`; 
+                    p.style.animationDelay = `-${Math.random() * 30}s`; 
+                    dustContainer.appendChild(p);
+                }
+            }
+
+            // 3. 键盘控制
+            document.addEventListener('keydown', (e) => {
+                const sections = document.querySelectorAll('section');
+                let currentIndex = 0;
+                let minDiff = Infinity;
+                sections.forEach((sec, index) => {
+                    const rect = sec.getBoundingClientRect();
+                    const diff = Math.abs(rect.top);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        currentIndex = index;
+                    }
+                });
+                if (['ArrowDown', 'PageDown', ' '].includes(e.key)) {
+                    e.preventDefault();
+                    if (currentIndex < sections.length - 1) {
+                        sections[currentIndex + 1].scrollIntoView({ behavior: 'smooth' });
+                    }
+                } else if (['ArrowUp', 'PageUp'].includes(e.key)) {
+                    e.preventDefault();
+                    if (currentIndex > 0) {
+                        sections[currentIndex - 1].scrollIntoView({ behavior: 'smooth' });
+                    }
+                }
+            });
+
+            // 4. 音频开关
+            const audioBtn = document.getElementById('audio-toggle');
+            const audio = document.getElementById('bg-music');
+            if (audioBtn && audio) {
+                const audioText = audioBtn.querySelector('span');
+                const audioBar = audioBtn.querySelector('div');
+                let isPlaying = false;
+
+                audioBtn.addEventListener('click', () => {
+                    if (isPlaying) {
+                        audio.pause();
+                        audioText.innerText = "静音";
+                        audioBar.classList.remove('w-10');
+                    } else {
+                        audio.play().catch(e => console.log("需用户交互才能播放"));
+                        audioText.innerText = "聆听";
+                        audioBar.classList.add('w-10');
+                    }
+                    isPlaying = !isPlaying;
+                });
+            }
+
+            // 5. 3D 导航
+            const sections = document.querySelectorAll('section');
+            const navItems = document.querySelectorAll('.nav-item');
+            const ITEM_HEIGHT = 50; 
+            let activeIndex = 0;
+            let windowHeight = window.innerHeight;
+            let centerY = windowHeight / 2;
+
+            window.addEventListener('resize', () => {
+                windowHeight = window.innerHeight;
+                centerY = windowHeight / 2;
+                updateNavWheel();
+            });
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        navItems.forEach(item => item.classList.remove('active'));
+                        const index = Array.from(sections).indexOf(entry.target);
+                        if (index !== -1 && navItems[index]) {
+                            navItems[index].classList.add('active');
+                            activeIndex = index;
+                            updateNavWheel();
+                        }
+                    }
+                });
+            }, { threshold: 0.5 }); 
+
+            sections.forEach(section => observer.observe(section));
+
+            function updateNavWheel() {
+                const baseOffset = centerY - (activeIndex * ITEM_HEIGHT) - (ITEM_HEIGHT / 2);
+                navItems.forEach((item, index) => {
+                    const targetY = baseOffset + (index * ITEM_HEIGHT);
+                    const distFromCenter = (targetY + ITEM_HEIGHT/2) - centerY;
+                    let rotateX = - (distFromCenter * 0.12); 
+                    if (rotateX > 80) rotateX = 80;
+                    if (rotateX < -80) rotateX = -80;
+                    const absDist = Math.abs(distFromCenter);
+                    const scale = Math.max(0.8, 1 - (absDist / (windowHeight * 1.5))); 
+                    let opacity = Math.max(0.1, 1 - (absDist / (windowHeight * 0.4))); 
+
+                    item.style.transform = `translateY(${targetY}px) rotateX(${rotateX}deg) scale(${scale})`;
+                    item.style.opacity = opacity;
+                });
+            }
+            updateNavWheel();
+
+            // 6. 水墨笔触 (Ink Cursor)
+            (function initInkCursor() {
+                const canvas = document.createElement('canvas');
+                canvas.style.position = 'fixed';
+                canvas.style.top = '0';
+                canvas.style.left = '0';
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                canvas.style.pointerEvents = 'none'; 
+                canvas.style.zIndex = '9999';
+                document.body.appendChild(canvas);
+
+                const ctx = canvas.getContext('2d');
+                let width, height;
+                let particles = [];
+
+                function resize() {
+                    width = canvas.width = window.innerWidth;
+                    height = canvas.height = window.innerHeight;
+                }
+                window.addEventListener('resize', resize);
+                resize();
+
+                let lastPos = { x: 0, y: 0 };
+                window.addEventListener('mousemove', (e) => {
+                    const dist = Math.hypot(e.clientX - lastPos.x, e.clientY - lastPos.y);
+                    if (dist > 2) {
+                        createParticle(e.clientX, e.clientY, dist);
+                        lastPos = { x: e.clientX, y: e.clientY };
+                    }
+                });
+
+                function createParticle(x, y, dist) {
+                    const size = Math.min(15, Math.max(2, 20 / dist)); 
+                    particles.push({
+                        x: x,
+                        y: y,
+                        size: size,
+                        alpha: 0.5,
+                        life: 1 
+                    });
+                }
+
+                function render() {
+                    ctx.clearRect(0, 0, width, height);
+                    for (let i = 0; i < particles.length; i++) {
+                        const p = particles[i];
+                        if (p.life <= 0) {
+                            particles.splice(i, 1);
+                            i--;
+                            continue;
+                        }
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        // 青墨色
+                        ctx.fillStyle = `rgba(44, 50, 50, ${p.alpha})`; 
+                        ctx.fill();
+                        p.life -= 0.02;
+                        p.alpha -= 0.02;
+                        p.size *= 0.96;
+                    }
+                    requestAnimationFrame(render);
+                }
+                render();
+            })();
+        });
+    </script>
+</body>
+</html>
